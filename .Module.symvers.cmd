@@ -1,0 +1,1 @@
+cmd_/home/root/xr17-lnx2.6.32-and-newer-pak_ver2.6/Module.symvers := sed 's/\.ko$$/\.o/' /home/root/xr17-lnx2.6.32-and-newer-pak_ver2.6/modules.order | scripts/mod/modpost -m   -o /home/root/xr17-lnx2.6.32-and-newer-pak_ver2.6/Module.symvers -e -i Module.symvers   -T -

@@ -1,0 +1,1 @@
+cmd_/home/root/xr17-lnx2.6.32-and-newer-pak_ver2.6/xr17v35x.ko := ld -r -EL  -maarch64linux -z norelro -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/root/xr17-lnx2.6.32-and-newer-pak_ver2.6/xr17v35x.ko /home/root/xr17-lnx2.6.32-and-newer-pak_ver2.6/xr17v35x.o /home/root/xr17-lnx2.6.32-and-newer-pak_ver2.6/xr17v35x.mod.o;  true
