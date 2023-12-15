@@ -347,7 +347,7 @@ static struct pciserial_board xrpciserial_boards[] __devinitdata = {
  *   share_irqs - whether we pass SA_SHIRQ to request_irq().  This option
  *                is unsafe when used on edge-triggered interrupts.
  */
-#define SERIALEXAR_SHARE_IRQS 1 
+#define SERIALEXAR_SHARE_IRQS 1
 unsigned int share_irqs = SERIALEXAR_SHARE_IRQS;
 
 /*
@@ -649,6 +649,7 @@ static void serialxr_start_tx(struct uart_port *port)
 		if (lcr & 0x80) {
 			printk(KERN_INFO"channelnum %d: serialxr start tx - LCR = 0x%x", up->channelnum, lcr);
 			serial_out(up, UART_LCR, lcr & 0x7f);	// Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
+			serial_out(up, 1, 0x7F);				// Tachlog
 		}
 		serial_out(up, UART_IER, up->ier);
 	}
@@ -664,6 +665,7 @@ static void serialxr_stop_rx(struct uart_port *port)
 	if (lcr & 0x80) {
 		printk(KERN_INFO"channelnum %d: serialxr stop rx - LCR = 0x%x", up->channelnum, lcr);
 		serial_out(up, UART_LCR, lcr & 0x7f);	// Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
+		serial_out(up, 1, 0x7F);				// Tachlog
 	}
 	up->port.read_status_mask &= ~UART_LSR_DR;
 	serial_out(up, UART_IER, up->ier);
@@ -731,6 +733,7 @@ receive_chars(struct uart_xr_port *up, unsigned int *status)
 						if (lcr & 0x80) {
 							printk(KERN_INFO"channelnum %d: receive chars (multidrop mode) - LCR = 0x%x", up->channelnum, lcr);
 							serial_out(up, UART_LCR, lcr & 0x7f);	// Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
+							serial_out(up, 1, 0x7f);  // Tachlog
 						}
 					  ch[i]= serial_in(up, XR_17v35x_UART_RHR);
 					}
@@ -1092,7 +1095,7 @@ static int serial_link_irq_chain(struct uart_xr_port *up)
 		spin_unlock_irq(&i->lock);
 		irq_flags |= up->port.irqflags;
 		ret = request_irq(up->port.irq, serialxr_interrupt,
-				  irq_flags, "xrserial", i);
+		 		  irq_flags, "xrserial", i);
 		if (ret < 0)
 			serial_do_unlink(i, up);
 	}
