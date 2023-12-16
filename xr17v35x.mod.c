@@ -37,6 +37,7 @@ __used __section("__versions") = {
 	{ 0x18722028, "pci_disable_device" },
 	{ 0xdcb764ad, "memset" },
 	{ 0xeb233a45, "__kmalloc" },
+	{ 0xc3524a1f, "pci_write_config_word" },
 	{ 0x480c8812, "pci_enable_device" },
 	{ 0x2928db1c, "uart_add_one_port" },
 	{ 0xc6f46339, "init_timer_key" },

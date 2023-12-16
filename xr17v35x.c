@@ -143,7 +143,7 @@ struct serial_uart_config
 #define XR_17V35x_MPIOSEL_15_8 0x99
 
 // Set this parameter to 1 to enable RS485 mode
-#define ENABLE_RS485 0
+#define ENABLE_RS485 1
 // Set this parameter to 1 to enable DTR RS-485 half duplex direction control
 #define USE_DTR_RS485 0
 // Set this parameter to 1 to enabled internal loopback
@@ -1295,8 +1295,7 @@ static int serialxr_startup(struct uart_port *port)
 	{
 		serial_out(up, UART_LCR, lcr & 0x7f); // Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
 	}
-	// serial_out(up, UART_IER, 0); // original
-	serial_out(up, UART_IER, 1); // tachlog
+	serial_out(up, UART_IER, 0);
 
 	/* Set the RX/TX trigger levels */
 	/* These are some default values, the OEMs can change these values
