@@ -132,7 +132,7 @@ struct serial_uart_config
 #define XR_17V35X_UART_XOFF1 0xC0
 #define XR_17V35X_UART_XON1 0xE0
 #define XR_17V35X_FCTR_RTS_8DELAY 0x03
-#define XR_17V35X_FCTR_TRGD 192
+#define XR_17V35X_FCTR_TRGD 0xC0
 #define XR_17V35x_FCTR_RS485 0x20
 
 #define XR_17V35x_MPIOLVL_7_0 0x90
@@ -363,7 +363,7 @@ unsigned int share_irqs = SERIALEXAR_SHARE_IRQS;
 #endif
 
 #if DEBUG
-#define DEBUG_INTR(fmt...) printk(fmt)
+	#define DEBUG_INTR(fmt...) //printk(fmt)
 #else
 #define DEBUG_INTR(fmt...) \
 	do                     \
@@ -696,7 +696,7 @@ static void serialxr_enable_ms(struct uart_port *port)
 		printk(KERN_INFO "channelnum %d: serialxr enable ms - LCR = 0x%x", up->channelnum, lcr);
 		serial_out(up, UART_LCR, lcr & 0x7f); // Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
 	}
-	serial_out(up, UART_IER, up->ier);
+	//serial_out(up, UART_IER, up->ier);
 }
 
 static void
@@ -715,99 +715,99 @@ receive_chars(struct uart_xr_port *up, unsigned int *status)
 	while (datasize_in_fifo != serial_in(up, XR_17V35X_RXFIFO_CNT))
 		/*Read Receive Fifo count until we get read same value twice*/
 		datasize_in_fifo = serial_in(up, XR_17V35X_RXFIFO_CNT);
+		//printk("data size = %x....", datasize_in_fifo);
+		port_index = up->port.line;
+		flag = TTY_NORMAL;
 
-	port_index = up->port.line;
-	flag = TTY_NORMAL;
-
-	if (unlikely(lsr & (UART_LSR_BI | UART_LSR_PE | UART_LSR_FE | UART_LSR_OE)))
-	{
-		/*
-		 * Mask off conditions which should be ignored.
-		 */
-		lsr &= up->port.read_status_mask;
-		if (lsr & UART_LSR_OE)
+		if (unlikely(lsr & (UART_LSR_BI | UART_LSR_PE | UART_LSR_FE | UART_LSR_OE)))
 		{
-			printk("OverRun Happen....");
-		}
-		if (lsr & UART_LSR_BI)
-		{
-			DEBUG_INTR("handling break....");
-			flag = TTY_BREAK;
-		}
-		else if (lsr & UART_LSR_PE)
-		{
-			flag = TTY_PARITY;
-
-			if (up->multidrop_mode == 1)
+			/*
+			 * Mask off conditions which should be ignored.
+			 */
+			lsr &= up->port.read_status_mask;
+			if (lsr & UART_LSR_OE)
 			{
-				// memcpy_fromio(ch, up->port.membase + UART_17V35X_RX_OFFSET, datasize_in_fifo);
-				for (i = 0; i < datasize_in_fifo; i++)
+				printk("OverRun Happen....");
+			}
+			if (lsr & UART_LSR_BI)
+			{
+				DEBUG_INTR("handling break....");
+				flag = TTY_BREAK;
+			}
+			else if (lsr & UART_LSR_PE)
+			{
+				flag = TTY_PARITY;
+
+				if (up->multidrop_mode == 1)
 				{
-					lcr = serial_in(up, UART_LCR);
-					if (lcr & 0x80)
+					// memcpy_fromio(ch, up->port.membase + UART_17V35X_RX_OFFSET, datasize_in_fifo);
+					for (i = 0; i < datasize_in_fifo; i++)
 					{
-						printk(KERN_INFO "channelnum %d: receive chars (multidrop mode) - LCR = 0x%x", up->channelnum, lcr);
-						serial_out(up, UART_LCR, lcr & 0x7f); // Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
+						lcr = serial_in(up, UART_LCR);
+						if (lcr & 0x80)
+						{
+							printk(KERN_INFO "channelnum %d: receive chars (multidrop mode) - LCR = 0x%x", up->channelnum, lcr);
+							serial_out(up, UART_LCR, lcr & 0x7f); // Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
+						}
+						ch[i] = serial_in(up, XR_17v35x_UART_RHR);
 					}
-					ch[i] = serial_in(up, XR_17v35x_UART_RHR);
-				}
-				up->port.icount.rx += datasize_in_fifo;
-				// up->port.icount.rx+=datasize_in_fifo;
-				DEBUG_INTR("Receive address byte:%02x\n", ch[0]);
-				if (up->is_match_address == 0)
-				{
-					if (ch[0] == up->multidrop_address)
+					up->port.icount.rx += datasize_in_fifo;
+					// up->port.icount.rx+=datasize_in_fifo;
+					DEBUG_INTR("Receive address byte:%02x\n", ch[0]);
+					if (up->is_match_address == 0)
 					{
-						DEBUG_INTR(" Enable the receiver\n");
-						// set EFR[4] = 1; enable the shaded bits
-						tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
-						tmp |= 0x10;
-						serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
-						serial_out(up, XR_17V35X_UART_MSR, 0); // Enable the receiver
-						// set EFR[4] = 0; disable the shaded bits
-						tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
-						tmp &= ~0x10;
-						serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
-						up->is_match_address = 1;
+						if (ch[0] == up->multidrop_address)
+						{
+							DEBUG_INTR(" Enable the receiver\n");
+							// set EFR[4] = 1; enable the shaded bits
+							tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
+							tmp |= 0x10;
+							serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
+							serial_out(up, XR_17V35X_UART_MSR, 0); // Enable the receiver
+							// set EFR[4] = 0; disable the shaded bits
+							tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
+							tmp &= ~0x10;
+							serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
+							up->is_match_address = 1;
+						}
+						else
+						{
+							// do nothing
+						}
 					}
 					else
 					{
-						// do nothing
+						if (ch[0] == up->multidrop_address)
+						{
+							// do dothing
+						}
+						else
+						{
+							DEBUG_INTR(" Disable the receiver\n");
+							// set EFR[4] = 1; enable the shaded bits
+							tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
+							tmp |= 0x10;
+							serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
+							serial_out(up, XR_17V35X_UART_MSR, 0x04); // Disable the receiver
+																	  // set EFR[4] = 0; disable the shaded bits
+							tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
+							tmp &= ~0x10;
+							serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
+							up->is_match_address = 0;
+						}
 					}
+					return;
 				}
-				else
+				if (up->multidrop_mode == 0)
 				{
-					if (ch[0] == up->multidrop_address)
-					{
-						// do dothing
-					}
-					else
-					{
-						DEBUG_INTR(" Disable the receiver\n");
-						// set EFR[4] = 1; enable the shaded bits
-						tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
-						tmp |= 0x10;
-						serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
-						serial_out(up, XR_17V35X_UART_MSR, 0x04); // Disable the receiver
-																  // set EFR[4] = 0; disable the shaded bits
-						tmp = serial_in(up, XR_17V35X_EXTENDED_EFR);
-						tmp &= ~0x10;
-						serial_out(up, XR_17V35X_EXTENDED_EFR, tmp);
-						up->is_match_address = 0;
-					}
+					printk("handling port<%d> Parity error....(%d)\n", port_index, up->multidrop_mode);
 				}
-				return;
 			}
-			if (up->multidrop_mode == 0)
+			else if (lsr & UART_LSR_FE)
 			{
-				printk("handling port<%d> Parity error....(%d)\n", port_index, up->multidrop_mode);
+				DEBUG_INTR("handling Frame error....\n");
+				flag = TTY_FRAME;
 			}
-		}
-		else if (lsr & UART_LSR_FE)
-		{
-			DEBUG_INTR("handling Frame error....\n");
-			flag = TTY_FRAME;
-		}
 	}
 
 	// memcpy_fromio(ch, up->port.membase + UART_17V35X_RX_OFFSET, datasize_in_fifo);
@@ -969,7 +969,7 @@ static void serialxr_handle_port(struct uart_xr_port *up)
 
 	status = serial_in(up, UART_LSR);
 
-	DEBUG_INTR("status = %x...", status);
+	DEBUG_INTR("status11 = %x...", status);
 
 	if (status & (UART_LSR_DR | UART_LSR_BI))
 		receive_chars(up, &status);
@@ -1015,7 +1015,7 @@ static irqreturn_t serialxr_interrupt(int irq, void *dev_id)
 		lcr = serial_in(up, UART_LCR); // store value of LCR
 		if (lcr & 0x80)
 		{
-			printk(KERN_INFO "channelnum %d: serialxr interrupt - LCR = 0x%x", up->channelnum, lcr);
+			//printk(KERN_INFO "channelnum %d: serialxr interrupt - LCR = 0x%x", up->channelnum, lcr);
 			serial_out(up, UART_LCR, lcr & 0x7F); // ensure LCR bit-7=0 before reading UART_IIR
 		}
 		iir = serial_in(up, UART_IIR);
@@ -1046,7 +1046,7 @@ static irqreturn_t serialxr_interrupt(int irq, void *dev_id)
 
 	spin_unlock(&i->lock);
 
-	DEBUG_INTR("end.\n");
+	//DEBUG_INTR("end.\n");
 	return IRQ_RETVAL(handled);
 }
 
@@ -1303,12 +1303,12 @@ static int serialxr_startup(struct uart_port *port)
 
 	if (up->deviceid > 0x258) // PCIe device
 	{
-		serial_out(up, XR_17V35X_EXTENDED_RXTRG, 32);
+		serial_out(up, XR_17V35X_EXTENDED_RXTRG, 128);
 		serial_out(up, XR_17V35X_EXTENDED_TXTRG, 64);
 	}
 	else // for 25x
 	{
-		serial_out(up, XR_17V35X_EXTENDED_RXTRG, 32); // 25x
+		serial_out(up, XR_17V35X_EXTENDED_RXTRG, 128); // 25x
 		serial_out(up, XR_17V35X_EXTENDED_TXTRG, 32);
 	}
 
@@ -1316,7 +1316,7 @@ static int serialxr_startup(struct uart_port *port)
 	fctr_reg = serial_in(up, XR_17V35X_EXTENDED_FCTR);
 	DEBUG_INTR(KERN_INFO "serialxr_startup: FCTR=0x%x", fctr_reg);
 #if ENABLE_RS485
-	serial_out(up, XR_17V35X_EXTENDED_FCTR, fctr_reg | XR_17V35X_FCTR_TRGD | XR_17V35X_FCTR_RTS_8DELAY | XR_17V35x_FCTR_RS485);
+	serial_out(up, XR_17V35X_EXTENDED_FCTR, fctr_reg | XR_17V35X_FCTR_TRGD | XR_17V35X_FCTR_RTS_8DELAY | XR_17V35x_FCTR_RS485| 0x0B);
 #if USE_DTR_RS485
 	serial_out(up, UART_MCR, 0x04); // use DTR for Auto RS-485 Control
 #endif
@@ -1347,7 +1347,7 @@ static int serialxr_startup(struct uart_port *port)
 	{
 		serial_out(up, UART_LCR, lcr & 0x7f); // Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
 	}
-	serial_out(up, UART_FCR, 0);
+	//serial_out(up, UART_FCR, 0);
 
 	/*
 	 * Clear the interrupt registers.
@@ -1388,7 +1388,7 @@ static int serialxr_startup(struct uart_port *port)
 	 * are set via set_termios(), which will be occurring imminently
 	 * anyway, so we don't enable them here.
 	 */
-	up->ier = UART_IER_RLSI | UART_IER_RDI;
+	up->ier = UART_IER_RDI; // UART_IER_RLSI |
 	lcr = serial_in(up, UART_LCR);
 	if (lcr & 0x80)
 	{
@@ -1460,7 +1460,7 @@ static void serialxr_shutdown(struct uart_port *port)
 		printk(KERN_INFO "channelnum %d: serialxr_shutdown2 - LCR = 0x%x", up->channelnum, lcr);
 		serial_out(up, UART_LCR, lcr & 0x7f); // Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
 	}
-	serial_out(up, UART_FCR, 0);
+	//serial_out(up, UART_FCR, 0);
 
 	/*
 	 * Read data port to reset things, and then unlink from
@@ -1818,7 +1818,7 @@ serialxr_set_termios(struct uart_port *port, struct ktermios *termios,
 	 */
 	up->ier &= ~UART_IER_MSI;
 	if (UART_ENABLE_MS(&up->port, termios->c_cflag))
-		up->ier |= UART_IER_MSI;
+		up->ier = 1;//UART_IER_MSI;
 
 	lcr = serial_in(up, UART_LCR);
 	if (lcr & 0x80)
@@ -1826,7 +1826,7 @@ serialxr_set_termios(struct uart_port *port, struct ktermios *termios,
 		printk(KERN_INFO "channelnum %d: serialxr_set_termios1 - LCR = 0x%x", up->channelnum, lcr);
 		serial_out(up, UART_LCR, lcr & 0x7f); // Set LCR bit-7=0 when accessing RHR/THR/IER/ISR to avoid incorrect register access
 	}
-	serial_out(up, UART_IER, up->ier);
+	serial_out(up, UART_IER, 1); // up->ier
 	reg_read = serial_in(up, XR_17V35X_EXTENDED_EFR);
 
 	if (termios->c_cflag & CRTSCTS)
@@ -1911,15 +1911,15 @@ serialxr_set_termios(struct uart_port *port, struct ktermios *termios,
 	*/
 	if ((up->deviceid == 0x354) || (up->deviceid == 0x4354) || (up->deviceid == 0x8354))
 	{
-		serial_out(up, XR_17V35x_MPIOSEL_7_0, 0x0FF); // 0x0ff= ALL INPUTS
+		//serial_out(up, XR_17V35x_MPIOSEL_7_0, 0x0FF); // 0x0ff= ALL INPUTS
 	}
 	else if ((up->deviceid == 0x358) || (up->deviceid == 0x4358) || (up->deviceid == 0x8358))
 	{
-		serial_out(up, XR_17V35x_MPIOSEL_7_0, 0x0FF);  // 0x0ff= ALL INPUTS
-		serial_out(up, XR_17V35x_MPIOSEL_15_8, 0x0FF); // 0x0ff= ALL INPUTS
+		//serial_out(up, XR_17V35x_MPIOSEL_7_0, 0x0FF);  // 0x0ff= ALL INPUTS
+		//serial_out(up, XR_17V35x_MPIOSEL_15_8, 0x0FF); // 0x0ff= ALL INPUTS
 	}
 
-	serialxr_set_mctrl(&up->port, up->port.mctrl);
+	//serialxr_set_mctrl(&up->port, up->port.mctrl);
 #if ENABLE_INTERNAL_LOOPBACK
 	reg_read = serial_in(up, UART_MCR);
 	serial_out(up, UART_MCR, (reg_read) | 0x10);
